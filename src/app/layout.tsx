@@ -26,7 +26,23 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${syne.variable} ${spaceMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {/* Global FREE FOREVER banner */}
+        <div style={{
+          background: 'linear-gradient(90deg, rgba(0,229,160,0.08), rgba(0,184,255,0.08), rgba(0,229,160,0.08))',
+          borderBottom: '1px solid rgba(0,229,160,0.12)',
+          padding: '5px 20px',
+          textAlign: 'center',
+          fontFamily: 'var(--font-space-mono), monospace',
+          fontSize: 10,
+          color: 'var(--green)',
+          letterSpacing: '3px',
+          textTransform: 'uppercase',
+        }}>
+          ✦ Free Forever · No Paywall · No Account Required · Open Source ✦
+        </div>
+        {children}
+      </body>
     </html>
   );
 }

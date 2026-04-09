@@ -8,11 +8,13 @@ const NAV_TABS = [
   { label: 'Markets',   href: '/' },
   { label: 'Portfolio', href: '/portfolio' },
   { label: 'Whales',    href: '/whales' },
+  { label: '⚡ AI Analyst', href: '/analyst' },
 ];
 
 export default function Header() {
   const pathname = usePathname();
   const [utc, setUtc] = useState('');
+  const [logoPulsed, setLogoPulsed] = useState(false);
 
   useEffect(() => {
     const tick = () => {
@@ -21,7 +23,9 @@ export default function Header() {
     };
     tick();
     const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    // One-time logo pulse after 500ms
+    const pt = setTimeout(() => setLogoPulsed(true), 500);
+    return () => { clearInterval(id); clearTimeout(pt); };
   }, []);
 
   return (
@@ -54,11 +58,11 @@ export default function Header() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 0 20px rgba(0,229,160,0.3)',
             fontSize: 18,
             fontWeight: 700,
             color: 'var(--green)',
             fontFamily: 'var(--font-syne), sans-serif',
+            animation: logoPulsed ? 'logo-pulse 1.8s ease-out 1 forwards' : 'none',
           }}>Σ</div>
           <div>
             <div style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)', lineHeight: 1.1 }}>OpenLedger</div>
@@ -70,6 +74,7 @@ export default function Header() {
         <nav style={{ display: 'flex', gap: 4 }}>
           {NAV_TABS.map(tab => {
             const active = pathname === tab.href;
+            const isAI = tab.href === '/analyst';
             return (
               <Link key={tab.href} href={tab.href} style={{
                 padding: '6px 18px',
@@ -77,9 +82,9 @@ export default function Header() {
                 fontFamily: 'var(--font-syne), sans-serif',
                 fontWeight: active ? 700 : 400,
                 fontSize: 13,
-                color: active ? 'var(--green)' : 'var(--text-mid)',
-                background: active ? 'var(--green-dim)' : 'transparent',
-                border: active ? '1px solid rgba(0,229,160,0.3)' : '1px solid transparent',
+                color: active ? 'var(--green)' : isAI ? 'var(--blue)' : 'var(--text-mid)',
+                background: active ? (isAI ? 'rgba(0,184,255,0.12)' : 'var(--green-dim)') : 'transparent',
+                border: active ? `1px solid ${isAI ? 'rgba(0,184,255,0.3)' : 'rgba(0,229,160,0.3)'}` : '1px solid transparent',
                 transition: 'all 0.2s',
               }}>
                 {tab.label}
@@ -90,7 +95,7 @@ export default function Header() {
 
         {/* Right: clock + live badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <span style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-dim)' }}>{utc}</span>
+          <span suppressHydrationWarning style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-dim)' }}>{utc}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 20, padding: '4px 10px' }}>
             <span style={{
               width: 6,
