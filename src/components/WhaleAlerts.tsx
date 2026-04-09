@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { MOCK_WHALE_ALERTS, COIN_BADGE_COLORS } from '@/lib/constants';
 import { timeAgo } from '@/lib/formatters';
 
@@ -8,12 +9,22 @@ interface Props {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  'transfer':          'var(--text-dim)',
-  'exchange inflow':   'var(--red)',
-  'exchange outflow':  'var(--green)',
+  'transfer':         'var(--text-dim)',
+  'exchange inflow':  'var(--red)',
+  'exchange outflow': 'var(--green)',
 };
 
 export default function WhaleAlerts({ showAll = false }: Props) {
+  const [mounted, setMounted] = useState(false);
+  // Tick every 30s so timeAgo stays fresh
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    setMounted(true);
+    const id = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+
   const alerts = showAll ? MOCK_WHALE_ALERTS : MOCK_WHALE_ALERTS.slice(0, 5);
 
   return (
@@ -67,8 +78,9 @@ export default function WhaleAlerts({ showAll = false }: Props) {
                     letterSpacing: '0.5px',
                   }}>{alert.type}</span>
                 </div>
-                <span style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--text-dim)' }}>
-                  {timeAgo(alert.timestamp)}
+                {/* suppressHydrationWarning prevents React mismatch error for time-ago values */}
+                <span suppressHydrationWarning style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--text-dim)' }}>
+                  {mounted ? timeAgo(alert.timestamp) : '—'}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

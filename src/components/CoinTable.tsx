@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { CoinMarket } from '@/types';
 import { fmt, pct } from '@/lib/formatters';
@@ -40,15 +39,19 @@ export default function CoinTable({ coins, loading }: Props) {
                   ))}
                 </tr>
               ))
-              : coins.map((coin, idx) => {
-                const pos24 = coin.price_change_percentage_24h >= 0;
+              : (coins ?? []).map((coin, idx) => {
+                const price = coin.current_price ?? 0;
+                const pos24 = (coin.price_change_percentage_24h ?? 0) >= 0;
                 const pos7d = (coin.price_change_percentage_7d_in_currency ?? 0) >= 0;
                 return (
                   <tr key={coin.id}>
                     <td style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-space-mono), monospace', fontSize: 12 }}>{idx + 1}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Image src={coin.image} alt={coin.name} width={28} height={28} style={{ borderRadius: '50%' }} />
+                        {coin.image && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={coin.image} alt={coin.name} width={28} height={28} style={{ borderRadius: '50%' }} />
+                        )}
                         <div>
                           <div style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 600, fontSize: 14 }}>{coin.name}</div>
                           <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase' }}>{coin.symbol}</div>
@@ -56,7 +59,7 @@ export default function CoinTable({ coins, loading }: Props) {
                       </div>
                     </td>
                     <td style={{ fontFamily: 'var(--font-space-mono), monospace', fontWeight: 700, fontSize: 13 }}>
-                      ${coin.current_price.toLocaleString()}
+                      ${price.toLocaleString()}
                     </td>
                     <td style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 12, color: pos24 ? 'var(--green)' : 'var(--red)' }}>
                       {pct(coin.price_change_percentage_24h)}

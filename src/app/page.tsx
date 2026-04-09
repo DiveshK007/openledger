@@ -7,11 +7,12 @@ import TickerBar from '@/components/TickerBar';
 import StatCard from '@/components/StatCard';
 import WhaleAlerts from '@/components/WhaleAlerts';
 import CoinTable from '@/components/CoinTable';
-
-const PriceChart = dynamic(() => import('@/components/PriceChart'), { ssr: false });
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { fetchMarkets, fetchGlobalStats, fetchFearGreed } from '@/lib/api';
 import { CoinMarket, GlobalStats, FearGreedData } from '@/types';
 import { fmt, pct } from '@/lib/formatters';
+
+const PriceChart = dynamic(() => import('@/components/PriceChart'), { ssr: false });
 
 export default function MarketsPage() {
   const [coins, setCoins] = useState<CoinMarket[]>([]);
@@ -19,27 +20,34 @@ export default function MarketsPage() {
   const [fearGreed, setFearGreed] = useState<FearGreedData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
-    const [c, g, fg] = await Promise.all([fetchMarkets(), fetchGlobalStats(), fetchFearGreed()]);
-    setCoins(c);
-    setGlobal(g);
-    setFearGreed(fg);
-    setLoading(false);
-  };
-
   useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [c, g, fg] = await Promise.all([fetchMarkets(), fetchGlobalStats(), fetchFearGreed()]);
+        if (cancelled) return;
+        setCoins(Array.isArray(c) ? c : []);
+        setGlobal(g);
+        setFearGreed(fg);
+      } catch {
+        // silently fall through — state stays as default
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
     load();
     const id = setInterval(load, 30000);
-    return () => clearInterval(id);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   const topGainer = coins.reduce<CoinMarket | null>((best, c) => {
-    if (!best || c.price_change_percentage_24h > best.price_change_percentage_24h) return c;
-    return best;
+    const pct24 = c.price_change_percentage_24h ?? -Infinity;
+    const bestPct24 = best?.price_change_percentage_24h ?? -Infinity;
+    return pct24 > bestPct24 ? c : best;
   }, null);
 
   return (
-    <>
+    <ErrorBoundary>
       <Header />
       <TickerBar coins={coins} />
       <div className="main-grid">
@@ -64,8 +72,8 @@ export default function MarketsPage() {
           />
           <StatCard
             label="Top Gainer 24h"
-            value={topGainer ? topGainer.symbol.toUpperCase() : '—'}
-            sub={topGainer ? pct(topGainer.price_change_percentage_24h) : ''}
+            value={topGainer ? (topGainer.symbol ?? '').toUpperCase() : '—'}
+            sub={topGainer ? pct(topGainer.price_change_percentage_24h ?? 0) : ''}
             accentColor="green"
           />
         </div>
@@ -77,6 +85,6 @@ export default function MarketsPage() {
 
         <CoinTable coins={coins} loading={loading} />
       </div>
-    </>
+    </ErrorBoundary>
   );
 }

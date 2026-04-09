@@ -5,11 +5,12 @@ import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
 import TickerBar from '@/components/TickerBar';
 import WalletTracker from '@/components/WalletTracker';
-
-const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { WalletHolding } from '@/types';
 import { MOCK_PORTFOLIO_HOLDINGS } from '@/lib/constants';
 import { fmt, pct } from '@/lib/formatters';
+
+const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
 function HoldingsTable({ holdings }: { holdings: WalletHolding[] }) {
   return (
@@ -27,7 +28,7 @@ function HoldingsTable({ holdings }: { holdings: WalletHolding[] }) {
           </tr>
         </thead>
         <tbody>
-          {holdings.map(h => {
+          {(holdings ?? []).map(h => {
             const pos = (h.change24h ?? 0) >= 0;
             return (
               <tr key={h.symbol}>
@@ -35,7 +36,7 @@ function HoldingsTable({ holdings }: { holdings: WalletHolding[] }) {
                   <div style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 600, fontSize: 14 }}>{h.name}</div>
                   <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase' }}>{h.symbol}</div>
                 </td>
-                <td style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 12 }}>{h.balance.toLocaleString()}</td>
+                <td style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 12 }}>{(h.balance ?? 0).toLocaleString()}</td>
                 <td style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 13, fontWeight: 700 }}>{fmt(h.usdValue ?? 0)}</td>
                 <td style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 12, color: pos ? 'var(--green)' : 'var(--red)' }}>
                   {h.change24h != null ? pct(h.change24h) : '—'}
@@ -53,7 +54,7 @@ export default function PortfolioPage() {
   const [holdings, setHoldings] = useState<WalletHolding[]>(MOCK_PORTFOLIO_HOLDINGS);
 
   return (
-    <>
+    <ErrorBoundary>
       <Header />
       <TickerBar coins={[]} />
       <div className="main-grid">
@@ -63,6 +64,6 @@ export default function PortfolioPage() {
           <HoldingsTable holdings={holdings} />
         </div>
       </div>
-    </>
+    </ErrorBoundary>
   );
 }

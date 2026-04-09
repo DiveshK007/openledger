@@ -43,7 +43,7 @@ export default function TickerBar({ coins }: Props) {
               borderRight: '1px solid var(--border)',
             }}>
               <span style={{ color: 'var(--text-dim)', fontWeight: 700, letterSpacing: '0.5px' }}>{coin.symbol.toUpperCase()}</span>
-              <span style={{ color: 'var(--text)' }}>${coin.current_price.toLocaleString()}</span>
+              <span style={{ color: 'var(--text)' }}>${(coin.current_price ?? 0).toLocaleString()}</span>
               <span style={{ color: pos ? 'var(--green)' : 'var(--red)' }}>{pct(coin.price_change_percentage_24h)}</span>
             </span>
           );
