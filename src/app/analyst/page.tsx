@@ -9,22 +9,55 @@ import { fetchFearGreed } from '@/lib/api';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  hidden?: boolean;
+}
+
+async function streamAnalyst(
+  messages: Message[],
+  autobrief: boolean,
+  onChunk: (text: string) => void
+): Promise<void> {
+  const res = await fetch('/api/analyst', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: messages.filter(m => !m.hidden).map(({ hidden: _h, ...m }) => m),
+      autobrief,
+    }),
+  });
+
+  if (!res.ok || !res.body) {
+    let errMsg = 'Claude API error — please try again.';
+    try { const d = await res.json(); if (d.error) errMsg = d.error; } catch { /* ignore */ }
+    throw new Error(errMsg);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    onChunk(decoder.decode(value, { stream: true }));
+  }
 }
 
 export default function AnalystPage() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [streamingText, setStreamingText] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [fgValue, setFgValue] = useState<number | null>(null);
   const [error, setError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const autobriefSentRef = useRef(false);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     fetchFearGreed().then(fg => { if (fg) setFgValue(fg.value); });
   }, []);
 
   const starters = [
-    'Summarize today\'s market',
+    "Summarize today's market",
     'Are whales buying or selling?',
     fgValue != null ? `What does Fear & Greed at ${fgValue} mean?` : 'What does the Fear & Greed index mean?',
     'Which asset looks strongest today?',
@@ -34,31 +67,61 @@ export default function AnalystPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, streamingText]);
 
-  const send = async (text: string) => {
-    if (!text.trim() || loading) return;
-    setError('');
-    const userMsg: Message = { role: 'user', content: text.trim() };
-    const next = [...messages, userMsg];
-    setMessages(next);
-    setInput('');
+  const runStream = async (userText: string, autobrief: boolean, currentMessages: Message[]) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
+    setError('');
+    setStreamingText('');
+
     try {
-      const res = await fetch('/api/analyst', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next }),
+      let accumulated = '';
+      await streamAnalyst(currentMessages, autobrief, chunk => {
+        accumulated += chunk;
+        setStreamingText(accumulated);
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
       });
-      const data = await res.json();
-      if (data.error) setError(data.error);
-      else setMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
-    } catch {
-      setError('Network error — please try again.');
+
+      // Commit streamed content to messages
+      if (autobrief) {
+        setMessages([
+          { role: 'user', content: 'Generate the market brief.', hidden: true },
+          { role: 'assistant', content: accumulated },
+        ]);
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: accumulated }]);
+      }
+      setStreamingText(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error — please try again.');
+      setStreamingText(null);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
+
+  const send = (text: string) => {
+    if (!text.trim() || loading) return;
+    const userMsg: Message = { role: 'user', content: text.trim() };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
+    setInput('');
+    runStream(text, false, nextMessages);
+  };
+
+  // Auto market brief on mount
+  useEffect(() => {
+    if (autobriefSentRef.current) return;
+    autobriefSentRef.current = true;
+    const t = setTimeout(() => runStream('', true, []), 600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const visibleMessages = messages.filter(m => !m.hidden);
 
   return (
     <ErrorBoundary>
@@ -67,8 +130,8 @@ export default function AnalystPage() {
         <div style={{ flex: 1, maxWidth: 860, width: '100%', margin: '0 auto', padding: '32px 20px 0' }}>
 
           {/* Page header */}
-          <div style={{ marginBottom: 28 }}>
-            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 6 }}>
               <h1 style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 800, fontSize: 'clamp(22px, 4vw, 32px)', color: 'var(--text)', margin: 0 }}>
                 AI Market Analyst
               </h1>
@@ -91,84 +154,76 @@ export default function AnalystPage() {
             </p>
           </div>
 
-          {/* Starter chips */}
-          {messages.length === 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: 10 }}>
-                Try asking:
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {/* Starter chips — only after brief loads */}
+          {visibleMessages.length > 0 && !loading && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                 {starters.map(s => (
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    disabled={loading}
                     style={{
                       background: 'var(--bg3)',
                       border: '1px solid var(--border)',
                       borderRadius: 20,
-                      padding: '8px 16px',
+                      padding: '6px 14px',
                       fontFamily: 'var(--font-space-mono), monospace',
-                      fontSize: 11,
+                      fontSize: 10,
                       color: 'var(--text-mid)',
                       cursor: 'pointer',
                       textTransform: 'none',
                       letterSpacing: 0,
                       transition: 'border-color 0.15s, color 0.15s',
                     }}
-                    onMouseEnter={e => { (e.currentTarget.style.borderColor = 'rgba(0,229,160,0.4)'); (e.currentTarget.style.color = 'var(--green)'); }}
-                    onMouseLeave={e => { (e.currentTarget.style.borderColor = 'var(--border)'); (e.currentTarget.style.color = 'var(--text-mid)'); }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,229,160,0.4)'; e.currentTarget.style.color = 'var(--green)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-mid)'; }}
                   >{s}</button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Empty state */}
-          {messages.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-dim)' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📊</div>
-              <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 12 }}>
-                Ask anything about today&apos;s crypto market
-              </div>
-            </div>
-          )}
-
           {/* Chat messages */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
-            {messages.map((msg, i) => (
+            {visibleMessages.map((msg, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                <div style={{
-                  maxWidth: '82%',
-                  background: msg.role === 'user' ? 'var(--green-dim)' : 'var(--bg2)',
-                  border: msg.role === 'user' ? '1px solid rgba(0,229,160,0.25)' : '1px solid var(--border)',
-                  borderRadius: msg.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
-                  padding: '12px 16px',
-                }}>
-                  {msg.role === 'assistant' && (
-                    <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 9, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: 8 }}>
-                      Claude · OpenLedger Analyst
-                    </div>
-                  )}
+                {msg.role === 'assistant' ? (
+                  <AssistantBubble content={msg.content} streaming={false} />
+                ) : (
                   <div style={{
-                    fontFamily: 'var(--font-space-mono), monospace',
-                    fontSize: 13,
-                    color: msg.role === 'user' ? 'var(--green)' : 'var(--text)',
-                    lineHeight: 1.75,
-                    whiteSpace: 'pre-wrap',
+                    maxWidth: '72%',
+                    background: 'var(--green-dim)',
+                    border: '1px solid rgba(0,229,160,0.25)',
+                    borderRadius: '12px 12px 4px 12px',
+                    padding: '12px 16px',
                   }}>
-                    {msg.content}
+                    <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 13, color: 'var(--green)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
+                      {msg.content}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
 
-            {loading && (
+            {/* Streaming message */}
+            {streamingText !== null && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <AssistantBubble content={streamingText} streaming={loading} />
+              </div>
+            )}
+
+            {/* Initial dots loader (before first chunk) */}
+            {loading && streamingText === '' && (
               <div style={{ display: 'flex' }}>
                 <div style={{
-                  background: 'var(--bg2)', border: '1px solid var(--border)',
-                  borderRadius: '12px 12px 12px 4px', padding: '14px 20px',
-                  display: 'flex', gap: 6, alignItems: 'center',
+                  background: 'var(--bg2)',
+                  border: '1px solid var(--border)',
+                  borderLeft: '3px solid var(--green)',
+                  borderRadius: '0 12px 12px 0',
+                  padding: '14px 20px',
+                  display: 'flex',
+                  gap: 6,
+                  alignItems: 'center',
                 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{
@@ -192,7 +247,7 @@ export default function AnalystPage() {
           </div>
         </div>
 
-        {/* Input — sticky on mobile */}
+        {/* Sticky input bar */}
         <div className="analyst-input-bar">
           <div style={{ maxWidth: 860, margin: '0 auto', width: '100%', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
             <textarea
@@ -223,12 +278,7 @@ export default function AnalystPage() {
               onClick={() => send(input)}
               disabled={loading || !input.trim()}
               className="btn-primary"
-              style={{
-                padding: '12px 20px',
-                borderRadius: 12,
-                flexShrink: 0,
-                opacity: (loading || !input.trim()) ? 0.45 : 1,
-              }}
+              style={{ padding: '12px 20px', borderRadius: 12, flexShrink: 0, opacity: (loading || !input.trim()) ? 0.45 : 1 }}
             >
               {loading ? '…' : 'Send →'}
             </button>
@@ -241,5 +291,44 @@ export default function AnalystPage() {
         <Footer />
       </div>
     </ErrorBoundary>
+  );
+}
+
+function AssistantBubble({ content, streaming }: { content: string; streaming: boolean }) {
+  return (
+    <div style={{
+      maxWidth: '88%',
+      background: 'var(--bg2)',
+      border: '1px solid var(--border)',
+      borderLeft: '3px solid var(--green)',
+      borderRadius: '0 12px 12px 0',
+      padding: '14px 18px',
+      boxShadow: '0 2px 12px rgba(0,229,160,0.06)',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        fontFamily: 'var(--font-space-mono), monospace',
+        fontSize: 9,
+        color: 'var(--green)',
+        textTransform: 'uppercase',
+        letterSpacing: '2px',
+        marginBottom: 10,
+      }}>
+        <span>⚡</span>
+        <span>OpenLedger AI</span>
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-space-mono), monospace',
+        fontSize: 13,
+        color: 'var(--text)',
+        lineHeight: 1.85,
+        whiteSpace: 'pre-wrap',
+      }}>
+        {content}
+        {streaming && content.length > 0 && <span className="streaming-cursor" />}
+      </div>
+    </div>
   );
 }
