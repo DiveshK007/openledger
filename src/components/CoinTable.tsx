@@ -1,9 +1,11 @@
 'use client';
 
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { CoinMarket } from '@/types';
 import { fmt, pct } from '@/lib/formatters';
-import Sparkline from './Sparkline';
+
+const Sparkline = dynamic(() => import('./Sparkline'), { ssr: false });
 
 interface Props {
   coins: CoinMarket[];

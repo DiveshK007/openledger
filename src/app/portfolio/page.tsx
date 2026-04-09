@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
 import TickerBar from '@/components/TickerBar';
 import WalletTracker from '@/components/WalletTracker';
-import PortfolioChart from '@/components/PortfolioChart';
+
+const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 import { WalletHolding } from '@/types';
 import { MOCK_PORTFOLIO_HOLDINGS } from '@/lib/constants';
 import { fmt, pct } from '@/lib/formatters';

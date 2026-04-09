@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 interface Props {
@@ -9,10 +8,7 @@ interface Props {
 }
 
 export default function Sparkline({ data, positive }: Props) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  if (!mounted || !data || data.length < 2) return <div style={{ width: 80, height: 36 }} />;
+  if (!data || data.length < 2) return <div style={{ width: 80, height: 36 }} />;
   const chartData = data.map(v => ({ v }));
   return (
     <div style={{ width: 80, height: 36 }}>

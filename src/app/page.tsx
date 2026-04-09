@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
 import TickerBar from '@/components/TickerBar';
 import StatCard from '@/components/StatCard';
-import PriceChart from '@/components/PriceChart';
 import WhaleAlerts from '@/components/WhaleAlerts';
 import CoinTable from '@/components/CoinTable';
+
+const PriceChart = dynamic(() => import('@/components/PriceChart'), { ssr: false });
 import { fetchMarkets, fetchGlobalStats, fetchFearGreed } from '@/lib/api';
 import { CoinMarket, GlobalStats, FearGreedData } from '@/types';
 import { fmt, pct } from '@/lib/formatters';

@@ -42,12 +42,9 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function PriceChart({ coins }: Props) {
-  const [mounted, setMounted] = useState(false);
   const [selectedId, setSelectedId] = useState('bitcoin');
   const [chartData, setChartData] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => setMounted(true), []);
 
   const coin = coins.find(c => c.id === selectedId);
   const positive = (coin?.price_change_percentage_24h ?? 0) >= 0;
@@ -69,7 +66,6 @@ export default function PriceChart({ coins }: Props) {
 
   return (
     <div className="panel" style={{ minHeight: 320 }}>
-      {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
           <div style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 18, color: 'var(--text)' }}>
@@ -84,7 +80,6 @@ export default function PriceChart({ coins }: Props) {
             {pct(coin?.price_change_percentage_24h ?? 0)} (24h)
           </div>
         </div>
-        {/* Coin selector */}
         <div style={{ display: 'flex', gap: 6 }}>
           {TABS.map(tab => (
             <button
@@ -104,7 +99,7 @@ export default function PriceChart({ coins }: Props) {
         </div>
       </div>
 
-      {!mounted || loading ? (
+      {loading ? (
         <div className="skeleton" style={{ height: 200, borderRadius: 8 }} />
       ) : (
         <ResponsiveContainer width="100%" height={200}>

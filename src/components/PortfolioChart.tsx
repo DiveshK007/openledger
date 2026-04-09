@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { WalletHolding } from '@/types';
 import { fmt } from '@/lib/formatters';
@@ -27,9 +26,6 @@ function CustomTooltip({ active, payload }: any) {
 }
 
 export default function PortfolioChart({ holdings }: Props) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   const total = holdings.reduce((s, h) => s + (h.usdValue ?? 0), 0);
   const data = holdings
     .filter(h => (h.usdValue ?? 0) > 0)
@@ -42,39 +38,35 @@ export default function PortfolioChart({ holdings }: Props) {
   return (
     <div className="panel">
       <div className="panel-header">Portfolio Allocation</div>
-      {!mounted ? (
-        <div className="skeleton" style={{ height: 260, borderRadius: 8 }} />
-      ) : (
-        <ResponsiveContainer width="100%" height={260}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={90}
-              paddingAngle={3}
-              dataKey="value"
-              isAnimationActive={false}
-            >
-              {data.map((_, i) => (
-                <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              formatter={(value, entry) => {
-                const d = entry.payload as { pct: string };
-                return (
-                  <span style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-mid)' }}>
-                    {value} <span style={{ color: 'var(--text-dim)' }}>{d.pct}%</span>
-                  </span>
-                );
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      )}
+      <ResponsiveContainer width="100%" height={260}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={90}
+            paddingAngle={3}
+            dataKey="value"
+            isAnimationActive={false}
+          >
+            {data.map((_, i) => (
+              <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+            ))}
+          </Pie>
+          <Tooltip content={<CustomTooltip />} />
+          <Legend
+            formatter={(value, entry) => {
+              const d = entry.payload as { pct: string };
+              return (
+                <span style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-mid)' }}>
+                  {value} <span style={{ color: 'var(--text-dim)' }}>{d.pct}%</span>
+                </span>
+              );
+            }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
     </div>
   );
 }
