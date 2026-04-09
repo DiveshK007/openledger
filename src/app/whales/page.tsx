@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import TickerBar from '@/components/TickerBar';
 import StatCard from '@/components/StatCard';
 import WhaleAlerts from '@/components/WhaleAlerts';
@@ -10,7 +11,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { fetchFearGreed, fetchTopProtocols } from '@/lib/api';
 import { FearGreedData, Protocol } from '@/types';
 import { fmt, pct } from '@/lib/formatters';
-import { MOCK_WHALE_ALERTS } from '@/lib/constants';
+import { WHALE_ALERT_DEFS } from '@/lib/constants';
 
 function TopProtocols({ protocols }: { protocols: Protocol[] }) {
   if (!protocols.length) return null;
@@ -61,8 +62,8 @@ export default function WhalesPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const inflows = MOCK_WHALE_ALERTS.filter(a => a.type === 'exchange inflow');
-  const outflows = MOCK_WHALE_ALERTS.filter(a => a.type === 'exchange outflow');
+  const inflows = WHALE_ALERT_DEFS.filter(a => a.type === 'exchange inflow');
+  const outflows = WHALE_ALERT_DEFS.filter(a => a.type === 'exchange outflow');
 
   return (
     <ErrorBoundary>
@@ -71,7 +72,7 @@ export default function WhalesPage() {
       <div className="main-grid">
         <div className="stat-row">
           <StatCard label="Largest Tx 24h" value="$118.4M" sub="1,200 BTC Transfer" accentColor="yellow" />
-          <StatCard label="Total Whale Vol" value="$403.3M" sub={`${MOCK_WHALE_ALERTS.length} transactions`} accentColor="blue" />
+          <StatCard label="Total Whale Vol" value="$403.3M" sub={`${WHALE_ALERT_DEFS.length} transactions`} accentColor="blue" />
           <StatCard label="Exchange Inflows" value={`${inflows.length} txs`} sub="Potential sell pressure" accentColor="red" />
           <StatCard label="Exchange Outflows" value={`${outflows.length} txs`} sub="Potential accumulation" accentColor="green" />
         </div>
@@ -84,6 +85,7 @@ export default function WhalesPage() {
           </div>
         </div>
       </div>
+      <Footer />
     </ErrorBoundary>
   );
 }

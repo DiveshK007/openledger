@@ -9,6 +9,7 @@ const NAV_TABS = [
   { label: 'Portfolio', href: '/portfolio' },
   { label: 'Whales',    href: '/whales' },
   { label: '⚡ AI Analyst', href: '/analyst' },
+  { label: 'Vision',    href: '/vision' },
 ];
 
 export default function Header() {

@@ -15,8 +15,30 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OpenLedger — Free Financial Intelligence",
-  description: "Institutional-grade crypto data for everyone. Real-time prices, whale alerts, wallet tracker — zero paywall.",
+  title: "OpenLedger — Free Alternative to Bloomberg & Nansen",
+  description: "Institutional-grade crypto data for everyone. Real-time prices, whale alerts, wallet tracker, AI analyst — zero paywall. Free alternative to Bloomberg, Nansen & Glassnode.",
+  metadataBase: new URL("https://openledger-six.vercel.app"),
+  openGraph: {
+    title: "OpenLedger — Free Alternative to Bloomberg & Nansen",
+    description: "Real-time crypto prices, whale alerts, AI analyst & DeFi data — completely free. No account required.",
+    url: "https://openledger-six.vercel.app",
+    siteName: "OpenLedger",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "OpenLedger — Free Financial Intelligence",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "OpenLedger — Free Alternative to Bloomberg & Nansen",
+    description: "Real-time crypto prices, whale alerts, AI analyst & DeFi data — completely free.",
+    images: ["/opengraph-image.png"],
+  },
 };
 
 export default function RootLayout({

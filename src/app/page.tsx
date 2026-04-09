@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import TickerBar from '@/components/TickerBar';
 import StatCard from '@/components/StatCard';
 import WhaleAlerts from '@/components/WhaleAlerts';
@@ -183,6 +184,7 @@ export default function MarketsPage() {
 
         <CoinTable coins={coins} loading={loading} />
       </div>
+      <Footer />
     </ErrorBoundary>
   );
 }

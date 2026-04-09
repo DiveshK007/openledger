@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import TickerBar from '@/components/TickerBar';
 import WalletTracker from '@/components/WalletTracker';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -64,6 +65,7 @@ export default function PortfolioPage() {
           <HoldingsTable holdings={holdings} />
         </div>
       </div>
+      <Footer />
     </ErrorBoundary>
   );
 }
