@@ -8,6 +8,7 @@ const NAV_TABS = [
   { label: 'Markets',       href: '/' },
   { label: 'Portfolio',     href: '/portfolio' },
   { label: 'Whales',        href: '/whales' },
+  { label: '💰 Yields',     href: '/yield' },
   { label: '⚡ AI Analyst', href: '/analyst' },
   { label: 'Vision',        href: '/vision' },
 ];
@@ -93,7 +94,8 @@ export default function Header() {
             const active = pathname === tab.href;
             const isAI = tab.href === '/analyst';
             const isVision = tab.href === '/vision';
-            const tabColor = isAI ? 'var(--blue)' : isVision ? 'var(--yellow)' : 'var(--green)';
+            const isYield = tab.href === '/yield';
+            const tabColor = isAI ? 'var(--blue)' : isVision ? 'var(--yellow)' : isYield ? 'var(--green)' : 'var(--green)';
             return (
               <Link key={tab.href} href={tab.href} style={{
                 padding: '6px 16px',
@@ -101,7 +103,7 @@ export default function Header() {
                 fontFamily: 'var(--font-syne), sans-serif',
                 fontWeight: active ? 700 : 400,
                 fontSize: 13,
-                color: active ? tabColor : isAI ? 'var(--blue)' : isVision ? 'rgba(255,211,42,0.7)' : 'var(--text-mid)',
+                color: active ? tabColor : isAI ? 'var(--blue)' : isVision ? 'rgba(255,211,42,0.7)' : isYield ? 'rgba(0,229,160,0.7)' : 'var(--text-mid)',
                 background: active ? (isAI ? 'rgba(0,184,255,0.12)' : isVision ? 'rgba(255,211,42,0.08)' : 'var(--green-dim)') : 'transparent',
                 border: active ? `1px solid ${isAI ? 'rgba(0,184,255,0.3)' : isVision ? 'rgba(255,211,42,0.3)' : 'rgba(0,229,160,0.3)'}` : '1px solid transparent',
                 transition: 'all 0.2s',

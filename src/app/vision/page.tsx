@@ -10,12 +10,12 @@ const LIVE_FEATURES = [
 ];
 
 const V2_FEATURES = [
-  { icon: '🔗', title: 'Real On-Chain Whale Tracking', desc: 'Live Ethereum + Solana mempool monitoring via Quicknode.' },
-  { icon: '🧠', title: 'Smart Money Wallets', desc: 'Track wallets of known funds, VCs and top traders.' },
-  { icon: '📊', title: 'Protocol TVL Dashboard', desc: 'DeFiLlama integration with historical charts per protocol.' },
-  { icon: '🔔', title: 'Price Alerts', desc: 'Set thresholds — get notified via Telegram or email.' },
-  { icon: '💰', title: 'DeFi Yield Aggregator', desc: 'Best APY across Aave, Compound, Curve, and 20+ protocols.' },
-  { icon: '📅', title: 'Token Unlock Calendar', desc: 'Never get dumped on — see every major unlock 90 days ahead.' },
+  { icon: '🔗', title: 'Real On-Chain Whale Tracking', desc: 'Live BTC (mempool.space), ETH (Etherscan), and multi-chain data via Whale Alert API.', live: true, href: '/whales' },
+  { icon: '💰', title: 'DeFi Yield Aggregator', desc: 'Best APY across Aave, Compound, Curve, Uniswap, and 100+ pools via DeFiLlama.', live: true, href: '/yield' },
+  { icon: '📊', title: 'Protocol TVL Dashboard', desc: 'DeFiLlama integration — top 10 protocols by TVL with 1d/7d change.', live: true, href: '/whales' },
+  { icon: '🧠', title: 'Smart Money Wallets', desc: 'Track wallets of known funds, VCs and top traders.', live: false, href: null },
+  { icon: '🔔', title: 'Price Alerts', desc: 'Set thresholds — get notified via Telegram or email.', live: false, href: null },
+  { icon: '📅', title: 'Token Unlock Calendar', desc: 'Never get dumped on — see every major unlock 90 days ahead.', live: false, href: null },
 ];
 
 const AGENTS = [
@@ -153,32 +153,41 @@ export default function VisionPage() {
                 flexShrink: 0, marginLeft: -36,
               }}>v2</div>
               <div>
-                <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 9, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '2px' }}>In Development</div>
-                <h2 style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 22, color: 'var(--text)', margin: 0 }}>What&apos;s Coming</h2>
+                <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 9, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '2px' }}>Shipping</div>
+                <h2 style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 22, color: 'var(--text)', margin: 0 }}>v2 Features</h2>
               </div>
               <div style={{
                 marginLeft: 'auto',
-                background: 'rgba(0,184,255,0.1)', border: '1px solid rgba(0,184,255,0.3)',
+                background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.3)',
                 borderRadius: 8, padding: '4px 12px',
-                fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--blue)', fontWeight: 700,
-              }}>Building</div>
+                fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--green)', fontWeight: 700,
+              }}>3 Live · 3 Building</div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
               {V2_FEATURES.map(f => (
                 <div key={f.title} style={{
                   background: 'var(--bg2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 12,
-                  padding: '20px',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  opacity: 0.85,
+                  border: `1px solid ${f.live ? 'rgba(0,229,160,0.25)' : 'var(--border)'}`,
+                  borderRadius: 12, padding: '20px',
+                  position: 'relative', overflow: 'hidden',
+                  opacity: f.live ? 1 : 0.7,
                 }}>
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(to right, var(--blue), transparent)' }} />
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(to right, ${f.live ? 'var(--green)' : 'var(--blue)'}, transparent)` }} />
                   <div style={{ fontSize: 28, marginBottom: 10 }}>{f.icon}</div>
-                  <div style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 6 }}>{f.title}</div>
-                  <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>{f.desc}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                    <div style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>{f.title}</div>
+                    {f.live && <span style={{ fontSize: 9, color: 'var(--green)', fontFamily: 'var(--font-space-mono), monospace', fontWeight: 700 }}>✓ LIVE</span>}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: f.href ? 12 : 0 }}>{f.desc}</div>
+                  {f.href && (
+                    <Link href={f.href} style={{
+                      display: 'inline-block', background: 'var(--green-dim)',
+                      border: '1px solid rgba(0,229,160,0.3)', borderRadius: 6,
+                      padding: '4px 10px', fontFamily: 'var(--font-space-mono), monospace',
+                      fontSize: 9, color: 'var(--green)', letterSpacing: '1px', textTransform: 'uppercase',
+                    }}>Open →</Link>
+                  )}
                 </div>
               ))}
             </div>

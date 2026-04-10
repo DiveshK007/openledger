@@ -11,7 +11,6 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { fetchFearGreed, fetchTopProtocols } from '@/lib/api';
 import { FearGreedData, Protocol } from '@/types';
 import { fmt, pct } from '@/lib/formatters';
-import { WHALE_ALERT_DEFS } from '@/lib/constants';
 
 function TopProtocols({ protocols }: { protocols: Protocol[] }) {
   if (!protocols.length) return null;
@@ -46,24 +45,66 @@ function TopProtocols({ protocols }: { protocols: Protocol[] }) {
   );
 }
 
+interface WhaleStats {
+  largestTxUsd: string;
+  largestTxDesc: string;
+  totalVolUsd: string;
+  txCount: number;
+  inflows: number;
+  outflows: number;
+}
+
 export default function WhalesPage() {
   const [fearGreed, setFearGreed] = useState<FearGreedData | null>(null);
   const [protocols, setProtocols] = useState<Protocol[]>([]);
+  const [stats, setStats] = useState<WhaleStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+
+    // Fetch fear/greed + protocols
     Promise.all([fetchFearGreed(), fetchTopProtocols()])
       .then(([fg, p]) => {
         if (cancelled) return;
         setFearGreed(fg);
         setProtocols(Array.isArray(p) ? p : []);
       })
-      .catch(() => { /* APIs unreachable — keep defaults */ });
+      .catch(() => {});
+
+    // Fetch whale stats
+    fetch('/api/whales')
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        const alerts: any[] = data.alerts ?? [];
+        if (!alerts.length) return;
+
+        const largest = alerts.reduce((best: any, a: any) =>
+          a.usdValueNum > (best?.usdValueNum ?? 0) ? a : best, null);
+        const totalVol = alerts.reduce((sum: number, a: any) => sum + (a.usdValueNum ?? 0), 0);
+        const inflows  = alerts.filter((a: any) => a.type === 'exchange inflow').length;
+        const outflows = alerts.filter((a: any) => a.type === 'exchange outflow').length;
+
+        const fmtUsd = (n: number) => {
+          if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+          if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+          if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+          return `$${n.toFixed(0)}`;
+        };
+
+        setStats({
+          largestTxUsd: largest ? fmtUsd(largest.usdValueNum) : '—',
+          largestTxDesc: largest ? `${largest.amount} ${largest.type}` : '—',
+          totalVolUsd: fmtUsd(totalVol),
+          txCount: alerts.length,
+          inflows,
+          outflows,
+        });
+      })
+      .catch(() => {});
+
     return () => { cancelled = true; };
   }, []);
-
-  const inflows = WHALE_ALERT_DEFS.filter(a => a.type === 'exchange inflow');
-  const outflows = WHALE_ALERT_DEFS.filter(a => a.type === 'exchange outflow');
 
   return (
     <ErrorBoundary>
@@ -71,10 +112,30 @@ export default function WhalesPage() {
       <TickerBar coins={[]} />
       <div className="main-grid">
         <div className="stat-row">
-          <StatCard label="Largest Tx 24h" value="$118.4M" sub="1,200 BTC Transfer" accentColor="yellow" />
-          <StatCard label="Total Whale Vol" value="$403.3M" sub={`${WHALE_ALERT_DEFS.length} transactions`} accentColor="blue" />
-          <StatCard label="Exchange Inflows" value={`${inflows.length} txs`} sub="Potential sell pressure" accentColor="red" />
-          <StatCard label="Exchange Outflows" value={`${outflows.length} txs`} sub="Potential accumulation" accentColor="green" />
+          <StatCard
+            label="Largest Tx"
+            value={stats?.largestTxUsd ?? '—'}
+            sub={stats?.largestTxDesc ?? 'Loading live data…'}
+            accentColor="yellow"
+          />
+          <StatCard
+            label="Total Whale Vol"
+            value={stats?.totalVolUsd ?? '—'}
+            sub={stats ? `${stats.txCount} transactions tracked` : 'Loading…'}
+            accentColor="blue"
+          />
+          <StatCard
+            label="Exchange Inflows"
+            value={stats ? `${stats.inflows} txs` : '—'}
+            sub="Potential sell pressure"
+            accentColor="red"
+          />
+          <StatCard
+            label="Exchange Outflows"
+            value={stats ? `${stats.outflows} txs` : '—'}
+            sub="Potential accumulation"
+            accentColor="green"
+          />
         </div>
 
         <div className="content-row">
