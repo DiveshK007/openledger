@@ -2,9 +2,9 @@ import { NextRequest } from 'next/server';
 
 interface CoinData {
   symbol: string;
-  current_price: number;
+  current_price: number | null;
   price_change_percentage_24h: number | null;
-  market_cap: number;
+  market_cap: number | null;
 }
 
 interface FearGreedData {
@@ -47,9 +47,10 @@ function buildSystemPrompt(
   lines.push('LIVE PRICES:');
   if (markets.length > 0) {
     for (const c of markets) {
-      const price = c.current_price >= 1
-        ? `$${c.current_price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
-        : `$${c.current_price.toFixed(4)}`;
+      const p = c.current_price ?? 0;
+      const price = p >= 1
+        ? `$${p.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+        : `$${p.toFixed(4)}`;
       lines.push(`- ${c.symbol.toUpperCase()}: ${price} (${fmt(c.price_change_percentage_24h)} 24h)`);
     }
   } else {
