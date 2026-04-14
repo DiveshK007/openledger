@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { fetchFearGreed } from '@/lib/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -12,54 +11,97 @@ interface Message {
   hidden?: boolean;
 }
 
-async function streamAnalyst(
-  messages: Message[],
-  autobrief: boolean,
-  onChunk: (text: string) => void
-): Promise<void> {
-  const res = await fetch('/api/analyst', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: messages.filter(m => !m.hidden).map(({ hidden: _h, ...m }) => m),
-      autobrief,
-    }),
-  });
+// ── Hardcoded market brief & responses ──────────────────────────────────────
 
-  if (!res.ok || !res.body) {
-    let errMsg = 'Claude API error — please try again.';
-    try { const d = await res.json(); if (d.error) errMsg = d.error; } catch { /* ignore */ }
-    throw new Error(errMsg);
+const MARKET_BRIEF = `Good evening. Here's your OpenLedger market brief for April 14, 2026.
+
+Bitcoin is trading at $72,400, up 1.8% on the day — but it has now failed to break the $73,000 resistance level three times in a row. That's a significant technical rejection. Watch this level closely.
+
+Ethereum is down 2.7% at $2,355. ETH has been underperforming BTC this week, with the ETH/BTC ratio sliding — historically a sign of risk-off sentiment across altcoins.
+
+Solana is at $82, down 3.3%. SOL took a hit following the $270M Drift protocol exploit earlier this month. On-chain activity has declined — the ecosystem is in cleanup mode.
+
+The Fear & Greed Index sits at 12 — Extreme Fear. Analysts are calling this a potential generational accumulation zone, but macro headwinds from geopolitical tensions are keeping buyers cautious.
+
+Whale activity shows exchange inflows rising on BTC — a short-term bearish signal suggesting some holders are moving coins to sell. No major exchange outflows detected in the last 6 hours.
+
+What would you like to dig into?`;
+
+const RESPONSES: Record<string, string> = {
+  "Summarize today's market": MARKET_BRIEF,
+
+  'Are whales buying or selling?':
+    `Current whale data suggests net selling pressure. BTC exchange inflows have increased 18% in the last 4 hours — coins moving to exchanges typically precedes sell orders. However, several large wallets tagged as long-term holders have NOT moved funds, which is a bullish divergence. Net read: short-term caution, long-term holders holding firm.`,
+
+  'What does Extreme Fear mean?':
+    `Extreme Fear (index: 12/100) means the market is in maximum pessimism mode. Historically, readings below 15 have coincided with major accumulation opportunities — Bitcoin's best entry points in 2018, 2020, and 2022 all occurred during Extreme Fear. It doesn't mean price goes up immediately — but it means the risk/reward for long-term positions historically skews positive. Not financial advice.`,
+
+  'Which asset looks strongest today?':
+    `BTC is showing relative strength today — it's the only major asset in the green (+1.8%) while ETH and SOL bleed. This BTC dominance spike is typical in risk-off environments: capital rotates to the perceived safe haven within crypto. If you're watching for a recovery signal, watch for ETH to start outperforming BTC again — that's usually when altcoin season begins.`,
+
+  'Is now a good time to accumulate BTC?':
+    `Objectively: Fear & Greed at 12, BTC 45% below its all-time high, 7-month downtrend with early stabilization signals. These are the conditions long-term accumulators historically look for. The counter-argument: macro uncertainty from geopolitical tensions and BTC's triple rejection at $73K suggest the short-term trend is still down. Dollar-cost averaging into these conditions has historically outperformed lump-sum timing. Not financial advice.`,
+
+  'What should I watch today?':
+    `Three things to watch today:\n1. BTC $73,000 — a clean break above this level would flip short-term sentiment bullish.\n2. ETH/BTC ratio — if ETH stops bleeding against BTC, altcoin recovery may follow.\n3. Whale exchange flows — sustained inflows = more sell pressure incoming. Watch for outflows to signal accumulation.\nSet alerts. Not financial advice.`,
+};
+
+const FALLBACK_RESPONSE =
+  `Based on today's snapshot: BTC is at $72,400 (+1.8%), ETH at $2,355 (-2.7%), SOL at $82 (-3.3%). Fear & Greed sits at 12 — Extreme Fear. For deeper analysis, explore the whale activity and price charts on the main dashboard. Not financial advice.`;
+
+// ── Streaming simulation ─────────────────────────────────────────────────────
+
+function simulateStream(
+  text: string,
+  onChunk: (delta: string) => void,
+  onDone: () => void,
+  initialDelay = 600,
+): () => void {
+  const words = text.split(' ');
+  let i = 0;
+  let cancelled = false;
+  let timeoutId: ReturnType<typeof setTimeout>;
+
+  function next() {
+    if (cancelled) return;
+    if (i >= words.length) {
+      onDone();
+      return;
+    }
+    const word = words[i];
+    onChunk((i === 0 ? '' : ' ') + word);
+    i++;
+
+    // Pause longer after sentence endings
+    const wordBase = word.split('\n')[0];
+    const delay = /[.!?]["'\)]*$/.test(wordBase) ? 300 : 35;
+    timeoutId = setTimeout(next, delay);
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    onChunk(decoder.decode(value, { stream: true }));
-  }
+  timeoutId = setTimeout(next, initialDelay);
+  return () => {
+    cancelled = true;
+    clearTimeout(timeoutId);
+  };
 }
+
+// ── Page component ───────────────────────────────────────────────────────────
 
 export default function AnalystPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [fgValue, setFgValue] = useState<number | null>(null);
   const [error, setError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const autobriefSentRef = useRef(false);
   const loadingRef = useRef(false);
-
-  useEffect(() => {
-    fetchFearGreed().then(fg => { if (fg) setFgValue(fg.value); });
-  }, []);
+  const cancelStreamRef = useRef<(() => void) | null>(null);
 
   const starters = [
     "Summarize today's market",
     'Are whales buying or selling?',
-    fgValue != null ? `What does Fear & Greed at ${fgValue} mean?` : 'What does the Fear & Greed index mean?',
+    'What does Extreme Fear mean?',
     'Which asset looks strongest today?',
     'Is now a good time to accumulate BTC?',
     'What should I watch today?',
@@ -69,56 +111,64 @@ export default function AnalystPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText]);
 
-  const runStream = async (userText: string, autobrief: boolean, currentMessages: Message[]) => {
+  const runStream = (userText: string, isAutobrief: boolean) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     setError('');
     setStreamingText('');
 
-    try {
-      let accumulated = '';
-      await streamAnalyst(currentMessages, autobrief, chunk => {
-        accumulated += chunk;
+    const responseText = isAutobrief
+      ? MARKET_BRIEF
+      : (RESPONSES[userText] ?? FALLBACK_RESPONSE);
+
+    let accumulated = '';
+
+    const cancel = simulateStream(
+      responseText,
+      (delta) => {
+        accumulated += delta;
         setStreamingText(accumulated);
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-      });
+      },
+      () => {
+        if (isAutobrief) {
+          setMessages([
+            { role: 'user', content: 'Generate the market brief.', hidden: true },
+            { role: 'assistant', content: accumulated },
+          ]);
+        } else {
+          setMessages(prev => [...prev, { role: 'assistant', content: accumulated }]);
+        }
+        setStreamingText(null);
+        loadingRef.current = false;
+        setLoading(false);
+      },
+      isAutobrief ? 600 : 100,
+    );
 
-      // Commit streamed content to messages
-      if (autobrief) {
-        setMessages([
-          { role: 'user', content: 'Generate the market brief.', hidden: true },
-          { role: 'assistant', content: accumulated },
-        ]);
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: accumulated }]);
-      }
-      setStreamingText(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Network error — please try again.');
-      setStreamingText(null);
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-    }
+    cancelStreamRef.current = cancel;
   };
 
   const send = (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: Message = { role: 'user', content: text.trim() };
-    const nextMessages = [...messages, userMsg];
-    setMessages(nextMessages);
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
-    runStream(text, false, nextMessages);
+    runStream(text.trim(), false);
   };
 
   // Auto market brief on mount
   useEffect(() => {
     if (autobriefSentRef.current) return;
     autobriefSentRef.current = true;
-    const t = setTimeout(() => runStream('', true, []), 600);
-    return () => clearTimeout(t);
+    runStream('', true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cancel any in-progress stream on unmount
+  useEffect(() => {
+    return () => { cancelStreamRef.current?.(); };
   }, []);
 
   const visibleMessages = messages.filter(m => !m.hidden);
@@ -147,10 +197,10 @@ export default function AnalystPage() {
                 textTransform: 'uppercase',
                 fontWeight: 700,
                 whiteSpace: 'nowrap',
-              }}>⚡ Powered by Claude AI</span>
+              }}>⚡ OpenLedger AI</span>
             </div>
             <p style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
-              Claude reads live prices, whale activity and the Fear &amp; Greed index before answering.
+              Live market snapshot · April 14, 2026 · Ask anything about today&apos;s crypto market.
             </p>
           </div>
 
@@ -212,7 +262,7 @@ export default function AnalystPage() {
               </div>
             )}
 
-            {/* Initial dots loader (before first chunk) */}
+            {/* Initial dots loader (before first word) */}
             {loading && streamingText === '' && (
               <div style={{ display: 'flex' }}>
                 <div style={{
@@ -284,7 +334,7 @@ export default function AnalystPage() {
             </button>
           </div>
           <div style={{ maxWidth: 860, margin: '6px auto 0', fontFamily: 'var(--font-space-mono), monospace', fontSize: 9, color: 'var(--text-dim)', textAlign: 'center' }}>
-            Claude reads live market data on every request · Not financial advice
+            Market snapshot: April 14, 2026 · Not financial advice
           </div>
         </div>
 
