@@ -263,7 +263,7 @@ button:disabled { cursor: not-allowed; }
   z-index: 50;
 }
 
-/* ── Header Nav (scrollable on mobile) ─────────────────────── */
+/* ── Header Nav (desktop) ───────────────────────────────────── */
 
 .header-nav {
   display: flex;
@@ -274,46 +274,47 @@ button:disabled { cursor: not-allowed; }
   -ms-overflow-style: none;
 }
 
-.header-nav::-webkit-scrollbar {
-  display: none;
+.header-nav::-webkit-scrollbar { display: none; }
+
+/* ── Hamburger button lines ─────────────────────────────────── */
+
+.ham-line {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--text-mid);
+  border-radius: 2px;
+  transition: transform 0.3s ease, opacity 0.3s ease, background 0.2s;
+  transform-origin: center;
+}
+
+.hamburger-btn:hover .ham-line { background: var(--green); }
+
+.ham-line-1-open { transform: translateY(7px) rotate(45deg); background: var(--green); }
+.ham-line-2-open { opacity: 0; transform: scaleX(0); }
+.ham-line-3-open { transform: translateY(-7px) rotate(-45deg); background: var(--green); }
+
+/* ── Drawer overlay animation ───────────────────────────────── */
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ── Mobile Responsive ──────────────────────────────────────── */
 
 @media (max-width: 768px) {
-  .stat-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .stat-row        { grid-template-columns: repeat(2, 1fr); }
+  .content-row     { grid-template-columns: 1fr; }
+  .header-clock    { display: none; }
+  .header-nav      { display: none; }
+  .header-right    { display: none !important; }
+  .mobile-header-right { display: flex !important; }
 
-  .content-row {
-    grid-template-columns: 1fr;
-  }
-
-  .header-clock {
-    display: none;
-  }
-
-  h1 {
-    font-size: clamp(26px, 5vw, 40px) !important;
-  }
+  h1 { font-size: clamp(26px, 5vw, 40px) !important; }
 }
 
 @media (max-width: 480px) {
-  .stat-row {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .main-grid {
-    padding: 16px 12px;
-    gap: 14px;
-  }
-
-  .header-nav {
-    gap: 2px;
-  }
-
-  .header-nav a {
-    padding: 5px 10px !important;
-    font-size: 12px !important;
-  }
+  .stat-row  { grid-template-columns: 1fr 1fr; }
+  .main-grid { padding: 16px 12px; gap: 14px; }
 }
