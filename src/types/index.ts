@@ -38,6 +38,10 @@ export interface WalletHolding {
   balance: number;
   usdValue: number | null;
   change24h: number | null;
+  priceUsd?: number | null;
+  allocation?: number | null;
+  chain?: 'ethereum' | 'solana';
+  tokenAddress?: string;
 }
 
 export interface WhaleAlert {

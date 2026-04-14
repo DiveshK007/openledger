@@ -37,6 +37,17 @@ export async function fetchCoinChart(coinId: string): Promise<number[]> {
   return apiFetch<number[]>(`/api/chart/${encodeURIComponent(coinId)}`, []);
 }
 
+export async function fetchPortfolio(address: string): Promise<{
+  holdings: WalletHolding[];
+  totalValue: number;
+  pnl24h: number | null;
+  pricedCount: number;
+  totalCount: number;
+  chain: string;
+} | null> {
+  return apiFetch(`/api/portfolio?address=${encodeURIComponent(address)}`, null);
+}
+
 export async function fetchEthWallet(address: string): Promise<WalletHolding[]> {
   try {
     const apiKey = process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY || 'YourApiKeyToken';
