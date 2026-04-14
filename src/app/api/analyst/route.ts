@@ -1,94 +1,142 @@
 import { NextRequest } from 'next/server';
 
-interface CoinData {
-  symbol: string;
-  current_price: number | null;
-  price_change_percentage_24h: number | null;
-  market_cap: number | null;
+export const maxDuration = 30; // seconds — Vercel serverless timeout
+
+const TRACKED = 'bitcoin,ethereum,solana,chainlink,uniswap,aave,the-graph,polygon-ecosystem-token';
+
+// ── Direct external fetches (no internal HTTP hops) ───────────────────────
+
+async function fetchMarkets() {
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${TRACKED}&order=market_cap_desc&sparkline=false&price_change_percentage=24h`,
+      { headers: { Accept: 'application/json' }, next: { revalidate: 60 } }
+    );
+    if (!res.ok) return [];
+    return await res.json() as Array<{
+      symbol: string;
+      current_price: number | null;
+      price_change_percentage_24h: number | null;
+    }>;
+  } catch {
+    return [];
+  }
 }
 
-interface FearGreedData {
-  value: number;
-  classification: string;
+async function fetchFearGreed() {
+  try {
+    const res = await fetch('https://api.alternative.me/fng/?limit=1', {
+      headers: { Accept: 'application/json' },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const item = json?.data?.[0];
+    if (!item) return null;
+    return { value: parseInt(item.value, 10), classification: item.value_classification as string };
+  } catch {
+    return null;
+  }
 }
 
-interface WhaleAlert {
-  coin: string;
-  amount: string;
-  usdValue: string;
-  type: string;
-  from: string;
-  to: string;
-  minsAgo: number;
+async function fetchBtcWhales() {
+  try {
+    const [blocksRes, priceRes] = await Promise.all([
+      fetch('https://mempool.space/api/blocks', { next: { revalidate: 60 } }),
+      fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { next: { revalidate: 60 } }),
+    ]);
+    if (!blocksRes.ok) return [];
+    const blocks: Array<{ id: string; timestamp: number }> = await blocksRes.json();
+    const priceData = priceRes.ok ? await priceRes.json() : {};
+    const btcPrice: number = priceData?.bitcoin?.usd ?? 72000;
+
+    const lines: string[] = [];
+    const MIN_BTC = 500_000 / btcPrice;
+
+    for (const block of blocks.slice(0, 2)) {
+      const txsRes = await fetch(`https://mempool.space/api/block/${block.id}/txs/0`, { next: { revalidate: 300 } });
+      if (!txsRes.ok) continue;
+      const txs: Array<{ vin?: Array<{ is_coinbase?: boolean }>; vout?: Array<{ value?: number; scriptpubkey_address?: string }> }> = await txsRes.json();
+      for (const tx of txs) {
+        if (tx.vin?.some(v => v.is_coinbase)) continue;
+        const vouts = tx.vout ?? [];
+        const maxSats = Math.max(...vouts.map(v => v.value ?? 0), 0);
+        const maxBtc = maxSats / 1e8;
+        if (maxBtc < MIN_BTC) continue;
+        const usd = Math.round(maxBtc * btcPrice);
+        const usdStr = usd >= 1e9 ? `$${(usd / 1e9).toFixed(1)}B` : usd >= 1e6 ? `$${(usd / 1e6).toFixed(1)}M` : `$${(usd / 1e3).toFixed(0)}K`;
+        const minsAgo = Math.max(0, Math.floor((Date.now() - block.timestamp * 1000) / 60_000));
+        lines.push(`- ${maxBtc.toFixed(2)} BTC (${usdStr}) — large transfer — ${minsAgo}m ago`);
+        if (lines.length >= 4) break;
+      }
+      if (lines.length >= 4) break;
+    }
+    return lines;
+  } catch {
+    return [];
+  }
 }
 
-interface WhalesData {
-  alerts: WhaleAlert[];
-}
+// ── System prompt builder ─────────────────────────────────────────────────
 
-function fmt(n: number | null | undefined, decimals = 1): string {
+function fmtPct(n: number | null | undefined, decimals = 1): string {
   if (n == null) return '?';
-  const sign = n >= 0 ? '+' : '';
-  return `${sign}${n.toFixed(decimals)}%`;
+  return `${n >= 0 ? '+' : ''}${n.toFixed(decimals)}%`;
 }
 
 function buildSystemPrompt(
-  markets: CoinData[],
-  fearGreed: FearGreedData | null,
-  whales: WhalesData | null,
+  markets: Array<{ symbol: string; current_price: number | null; price_change_percentage_24h: number | null }>,
+  fearGreed: { value: number; classification: string } | null,
+  whaleLines: string[],
   fetchedAt: string,
 ): string {
-  const lines: string[] = [];
+  const lines: string[] = [
+    `You are OpenLedger's AI market analyst. Live market data fetched at ${fetchedAt}:`,
+    '',
+    'LIVE PRICES:',
+  ];
 
-  lines.push(`You are OpenLedger's AI market analyst. You have access to live market data fetched at ${fetchedAt}:`);
-  lines.push('');
-
-  // Prices
-  lines.push('LIVE PRICES:');
   if (markets.length > 0) {
     for (const c of markets) {
       const p = c.current_price ?? 0;
       const price = p >= 1
         ? `$${p.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
         : `$${p.toFixed(4)}`;
-      lines.push(`- ${c.symbol.toUpperCase()}: ${price} (${fmt(c.price_change_percentage_24h)} 24h)`);
+      lines.push(`- ${c.symbol.toUpperCase()}: ${price} (${fmtPct(c.price_change_percentage_24h)} 24h)`);
     }
   } else {
     lines.push('- (price data temporarily unavailable)');
   }
+
   lines.push('');
 
-  // Fear & Greed
   if (fearGreed) {
     lines.push(`FEAR & GREED INDEX: ${fearGreed.value}/100 — ${fearGreed.classification}`);
-    const fg = fearGreed.value;
-    if (fg <= 20) lines.push('Interpretation: Extreme pessimism — historically a potential accumulation zone.');
-    else if (fg <= 40) lines.push('Interpretation: Market fear — caution prevalent, risk appetite low.');
-    else if (fg <= 60) lines.push('Interpretation: Neutral sentiment — no strong directional bias.');
-    else if (fg <= 80) lines.push('Interpretation: Greed — momentum positive but watch for overextension.');
-    else lines.push('Interpretation: Extreme greed — elevated risk of correction.');
+    const v = fearGreed.value;
+    if (v <= 20)      lines.push('Signal: Extreme pessimism — historically a potential accumulation zone.');
+    else if (v <= 40) lines.push('Signal: Fear — risk appetite low, caution prevalent.');
+    else if (v <= 60) lines.push('Signal: Neutral — no strong directional bias.');
+    else if (v <= 80) lines.push('Signal: Greed — positive momentum, watch for overextension.');
+    else              lines.push('Signal: Extreme greed — elevated correction risk.');
   } else {
-    lines.push('FEAR & GREED INDEX: (data temporarily unavailable)');
+    lines.push('FEAR & GREED INDEX: (temporarily unavailable)');
   }
-  lines.push('');
 
-  // Whale activity
-  lines.push('RECENT WHALE ACTIVITY:');
-  const alerts = whales?.alerts?.slice(0, 6) ?? [];
-  if (alerts.length > 0) {
-    for (const w of alerts) {
-      const ago = w.minsAgo === 0 ? 'just now' : `${w.minsAgo}m ago`;
-      lines.push(`- ${w.amount} (${w.usdValue}) — ${w.type} — ${w.from} → ${w.to} — ${ago}`);
-    }
+  lines.push('');
+  lines.push('RECENT WHALE ACTIVITY (BTC on-chain):');
+  if (whaleLines.length > 0) {
+    lines.push(...whaleLines);
   } else {
-    lines.push('- (no major whale transactions detected in the last 2 hours)');
+    lines.push('- (no large transactions detected in recent blocks)');
   }
-  lines.push('');
 
-  lines.push(`Be a sharp, concise, data-driven analyst. Reference specific numbers from the live data above. Give clear directional reads. Always end responses with: Not financial advice.`);
+  lines.push('');
+  lines.push('Be a sharp, concise, data-driven analyst. Reference specific numbers. Give clear directional reads. Always end with: Not financial advice.');
 
   return lines.join('\n');
 }
+
+// ── Route handler ─────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
@@ -97,34 +145,23 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: 'ANTHROPIC_API_KEY not set. Add it in Vercel → Project Settings → Environment Variables.' }),
+        JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured. Add it in Vercel → Settings → Environment Variables, then redeploy.' }),
         { status: 503, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Derive base URL from the incoming request
-    const baseUrl = new URL(req.url).origin;
-
-    // Fetch live data in parallel — failures are non-fatal
-    const [marketsRes, fearGreedRes, whalesRes] = await Promise.allSettled([
-      fetch(`${baseUrl}/api/markets`).then(r => r.json() as Promise<CoinData[]>),
-      fetch(`${baseUrl}/api/feargreed`).then(r => r.json() as Promise<FearGreedData | null>),
-      fetch(`${baseUrl}/api/whales`).then(r => r.json() as Promise<WhalesData>),
+    // Fetch live context directly — no internal HTTP hops
+    const [markets, fearGreed, whaleLines] = await Promise.all([
+      fetchMarkets(),
+      fetchFearGreed(),
+      fetchBtcWhales(),
     ]);
 
-    const markets   = marketsRes.status   === 'fulfilled' ? (marketsRes.value   ?? []) : [];
-    const fearGreed = fearGreedRes.status === 'fulfilled' ? (fearGreedRes.value ?? null) : null;
-    const whales    = whalesRes.status    === 'fulfilled' ? (whalesRes.value    ?? null) : null;
-
-    const fetchedAt = new Date().toUTCString();
-    const systemPrompt = buildSystemPrompt(markets, fearGreed, whales, fetchedAt);
+    const systemPrompt = buildSystemPrompt(markets, fearGreed, whaleLines, new Date().toUTCString());
 
     const finalMessages: { role: string; content: string }[] = autobrief
-      ? [{ role: 'user', content: 'Give me a professional market brief covering today\'s key price action, whale signals, and the Fear & Greed reading. Keep it under 200 words. End with: What would you like to dig into?' }]
-      : (messages ?? []).map((m: { role: string; content: string }) => ({
-          role: m.role,
-          content: m.content,
-        }));
+      ? [{ role: 'user', content: "Give me a professional market brief covering today's key price action, whale signals, and the Fear & Greed reading. Keep it under 200 words. End with: What would you like to dig into?" }]
+      : (messages ?? []).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }));
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -150,7 +187,7 @@ export async function POST(req: NextRequest) {
         const parsed = JSON.parse(errBody);
         const detail = parsed?.error?.message ?? parsed?.message;
         if (detail) userMsg += `: ${detail}`;
-      } catch { /* non-JSON body */ }
+      } catch { /* non-JSON error body */ }
       return new Response(
         JSON.stringify({ error: userMsg }),
         { status: anthropicRes.status, headers: { 'Content-Type': 'application/json' } }
@@ -181,9 +218,7 @@ export async function POST(req: NextRequest) {
                 ) {
                   controller.enqueue(encoder.encode(parsed.delta.text));
                 }
-              } catch {
-                // skip malformed SSE lines
-              }
+              } catch { /* skip malformed SSE lines */ }
             }
           }
         } finally {
@@ -203,7 +238,7 @@ export async function POST(req: NextRequest) {
     const message = e instanceof Error ? e.message : String(e);
     console.error('analyst route error:', message, e);
     return new Response(
-      JSON.stringify({ error: `AI Analyst error: ${message}. Please try again or check Vercel function logs.` }),
+      JSON.stringify({ error: `Analyst error: ${message}` }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
