@@ -145,8 +145,14 @@ export async function POST(req: NextRequest) {
     if (!anthropicRes.ok) {
       const errBody = await anthropicRes.text();
       console.error('Anthropic API error:', anthropicRes.status, errBody);
+      let userMsg = `Claude API error (HTTP ${anthropicRes.status})`;
+      try {
+        const parsed = JSON.parse(errBody);
+        const detail = parsed?.error?.message ?? parsed?.message;
+        if (detail) userMsg += `: ${detail}`;
+      } catch { /* non-JSON body */ }
       return new Response(
-        JSON.stringify({ error: 'Claude API error — please try again.' }),
+        JSON.stringify({ error: userMsg }),
         { status: anthropicRes.status, headers: { 'Content-Type': 'application/json' } }
       );
     }
