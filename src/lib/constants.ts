@@ -2,19 +2,19 @@ import { WalletHolding } from '@/types';
 
 export const TRACKED_COINS = [
   "bitcoin", "ethereum", "solana", "chainlink",
-  "uniswap", "aave", "the-graph", "matic-network"
+  "uniswap", "aave", "the-graph", "polygon-ecosystem-token"
 ];
 
 export const COIN_SYMBOLS: Record<string, string> = {
   bitcoin: "BTC", ethereum: "ETH", solana: "SOL",
   chainlink: "LINK", uniswap: "UNI", aave: "AAVE",
-  "the-graph": "GRT", "matic-network": "MATIC"
+  "the-graph": "GRT", "polygon-ecosystem-token": "POL"
 };
 
 export const COIN_BADGE_COLORS: Record<string, string> = {
   BTC: "#ffc107", ETH: "#627eea", SOL: "#14f195",
   LINK: "#2b61f6", UNI: "#ff007a", AAVE: "#b6509e",
-  GRT: "#6f4cff", MATIC: "#8247e5"
+  GRT: "#6f4cff", POL: "#8247e5"
 };
 
 // Whale alert data is now fetched live from /api/whales

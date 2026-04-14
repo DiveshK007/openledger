@@ -60,10 +60,12 @@ export default function PortfolioPage() {
       <TickerBar coins={[]} />
       <div className="main-grid">
         <WalletTracker onHoldingsChange={setHoldings} />
-        <div className="content-row">
-          <PortfolioChart holdings={holdings} />
-          <HoldingsTable holdings={holdings} />
-        </div>
+        {holdings.length > 0 && (
+          <div className="content-row">
+            <PortfolioChart holdings={holdings} />
+            <HoldingsTable holdings={holdings} />
+          </div>
+        )}
       </div>
       <Footer />
     </ErrorBoundary>

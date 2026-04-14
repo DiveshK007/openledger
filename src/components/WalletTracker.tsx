@@ -32,8 +32,8 @@ export default function WalletTracker({ onHoldingsChange }: Props) {
       onHoldingsChange(result);
     } catch {
       setError('Could not fetch wallet. Check the address and try again.');
-      setHoldings(MOCK_PORTFOLIO_HOLDINGS);
-      onHoldingsChange(MOCK_PORTFOLIO_HOLDINGS);
+      setHoldings([]);
+      onHoldingsChange([]);
     } finally {
       setLoading(false);
     }
@@ -61,17 +61,34 @@ export default function WalletTracker({ onHoldingsChange }: Props) {
         </div>
       )}
 
-      {/* Summary row */}
-      <div style={{ display: 'flex', gap: 20, marginBottom: 16, alignItems: 'center' }}>
-        <div>
-          <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '2px' }}>Wallet</div>
-          <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 12, color: 'var(--text-mid)' }}>{shortenAddress(address)}</div>
+      {/* Summary row — only shown when holdings are loaded */}
+      {holdings.length > 0 && (
+        <div style={{ display: 'flex', gap: 20, marginBottom: 16, alignItems: 'center' }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '2px' }}>Wallet</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 12, color: 'var(--text-mid)' }}>{shortenAddress(address)}</span>
+              {address.trim().toLowerCase() === MOCK_PORTFOLIO_WALLET.toLowerCase() && (
+                <span style={{
+                  fontFamily: 'var(--font-space-mono), monospace',
+                  fontSize: 9,
+                  color: 'var(--yellow)',
+                  background: 'rgba(255,193,7,0.1)',
+                  border: '1px solid rgba(255,193,7,0.25)',
+                  borderRadius: 4,
+                  padding: '1px 6px',
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                }}>Demo</span>
+              )}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '2px' }}>Portfolio Value</div>
+            <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 20, fontWeight: 700, color: 'var(--green)' }}>{fmt(totalValue)}</div>
+          </div>
         </div>
-        <div>
-          <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '2px' }}>Portfolio Value</div>
-          <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 20, fontWeight: 700, color: 'var(--green)' }}>{fmt(totalValue)}</div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

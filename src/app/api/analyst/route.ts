@@ -193,9 +193,10 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e) {
-    console.error('analyst route error:', e);
+    const message = e instanceof Error ? e.message : String(e);
+    console.error('analyst route error:', message, e);
     return new Response(
-      JSON.stringify({ error: 'Internal server error.' }),
+      JSON.stringify({ error: `AI Analyst error: ${message}. Please try again or check Vercel function logs.` }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

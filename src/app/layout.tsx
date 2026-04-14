@@ -61,7 +61,14 @@ export default function RootLayout({
           letterSpacing: '3px',
           textTransform: 'uppercase',
         }}>
-          ✦ Free Forever · No Paywall · No Account Required · Open Source ✦
+          ✦ Free Forever · No Paywall · No Account Required ·{' '}
+          <a
+            href="https://github.com/DiveshK007/openledger"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'inherit', textDecoration: 'none' }}
+          >Open Source ↗</a>
+          {' '}✦
         </div>
         {children}
       </body>

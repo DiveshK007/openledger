@@ -48,6 +48,15 @@ export default function Footer() {
           <span style={{ color: 'var(--yellow)' }}>Claude AI</span>
           <br />
           <span style={{ color: 'var(--text-dim)' }}>Data is informational only · Not financial advice</span>
+          <br />
+          <a
+            href="https://github.com/DiveshK007/openledger"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--text-dim)', textDecoration: 'none', transition: 'color 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--green)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
+          >GitHub ↗</a>
         </div>
       </div>
     </footer>
