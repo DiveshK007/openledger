@@ -150,7 +150,7 @@ export default function AnalystPage() {
               }}>⚡ Powered by Claude AI</span>
             </div>
             <p style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
-              Claude reads live prices, whale activity and the Fear &amp; Greed index before answering.
+              Live prices, whale alerts &amp; Fear &amp; Greed pulled fresh on every request.
             </p>
           </div>
 

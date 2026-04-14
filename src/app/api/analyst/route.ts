@@ -1,5 +1,94 @@
 import { NextRequest } from 'next/server';
 
+interface CoinData {
+  symbol: string;
+  current_price: number;
+  price_change_percentage_24h: number | null;
+  market_cap: number;
+}
+
+interface FearGreedData {
+  value: number;
+  classification: string;
+}
+
+interface WhaleAlert {
+  coin: string;
+  amount: string;
+  usdValue: string;
+  type: string;
+  from: string;
+  to: string;
+  minsAgo: number;
+}
+
+interface WhalesData {
+  alerts: WhaleAlert[];
+}
+
+function fmt(n: number | null | undefined, decimals = 1): string {
+  if (n == null) return '?';
+  const sign = n >= 0 ? '+' : '';
+  return `${sign}${n.toFixed(decimals)}%`;
+}
+
+function buildSystemPrompt(
+  markets: CoinData[],
+  fearGreed: FearGreedData | null,
+  whales: WhalesData | null,
+  fetchedAt: string,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`You are OpenLedger's AI market analyst. You have access to live market data fetched at ${fetchedAt}:`);
+  lines.push('');
+
+  // Prices
+  lines.push('LIVE PRICES:');
+  if (markets.length > 0) {
+    for (const c of markets) {
+      const price = c.current_price >= 1
+        ? `$${c.current_price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+        : `$${c.current_price.toFixed(4)}`;
+      lines.push(`- ${c.symbol.toUpperCase()}: ${price} (${fmt(c.price_change_percentage_24h)} 24h)`);
+    }
+  } else {
+    lines.push('- (price data temporarily unavailable)');
+  }
+  lines.push('');
+
+  // Fear & Greed
+  if (fearGreed) {
+    lines.push(`FEAR & GREED INDEX: ${fearGreed.value}/100 — ${fearGreed.classification}`);
+    const fg = fearGreed.value;
+    if (fg <= 20) lines.push('Interpretation: Extreme pessimism — historically a potential accumulation zone.');
+    else if (fg <= 40) lines.push('Interpretation: Market fear — caution prevalent, risk appetite low.');
+    else if (fg <= 60) lines.push('Interpretation: Neutral sentiment — no strong directional bias.');
+    else if (fg <= 80) lines.push('Interpretation: Greed — momentum positive but watch for overextension.');
+    else lines.push('Interpretation: Extreme greed — elevated risk of correction.');
+  } else {
+    lines.push('FEAR & GREED INDEX: (data temporarily unavailable)');
+  }
+  lines.push('');
+
+  // Whale activity
+  lines.push('RECENT WHALE ACTIVITY:');
+  const alerts = whales?.alerts?.slice(0, 6) ?? [];
+  if (alerts.length > 0) {
+    for (const w of alerts) {
+      const ago = w.minsAgo === 0 ? 'just now' : `${w.minsAgo}m ago`;
+      lines.push(`- ${w.amount} (${w.usdValue}) — ${w.type} — ${w.from} → ${w.to} — ${ago}`);
+    }
+  } else {
+    lines.push('- (no major whale transactions detected in the last 2 hours)');
+  }
+  lines.push('');
+
+  lines.push(`Be a sharp, concise, data-driven analyst. Reference specific numbers from the live data above. Give clear directional reads. Always end responses with: Not financial advice.`);
+
+  return lines.join('\n');
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { messages, autobrief } = await req.json();
@@ -12,36 +101,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are OpenLedger's AI market analyst. You have access to today's live market snapshot as of April 14, 2026:
+    // Derive base URL from the incoming request
+    const baseUrl = new URL(req.url).origin;
 
-PRICES:
-- BTC: $72,400 (+1.8% 24h) — rejected $73,000 resistance 3x
-- ETH: $2,355 (-2.7% 24h) — underperforming BTC, ETH/BTC ratio falling
-- SOL: $82 (-3.3% 24h) — post-Drift exploit ($270M), activity declining
-- LINK: $12.40 (-1.1% 24h)
-- UNI: $7.20 (-2.8% 24h)
-- AAVE: $142 (-1.9% 24h)
+    // Fetch live data in parallel — failures are non-fatal
+    const [marketsRes, fearGreedRes, whalesRes] = await Promise.allSettled([
+      fetch(`${baseUrl}/api/markets`).then(r => r.json() as Promise<CoinData[]>),
+      fetch(`${baseUrl}/api/feargreed`).then(r => r.json() as Promise<FearGreedData | null>),
+      fetch(`${baseUrl}/api/whales`).then(r => r.json() as Promise<WhalesData>),
+    ]);
 
-MARKET CONDITIONS:
-- Fear & Greed Index: 12 (Extreme Fear)
-- Total Market Cap: $2.53T
-- 24h Volume: $88.4B
-- BTC Dominance: rising (risk-off signal)
-- Market trend: 7-month downtrend, early stabilization signals
+    const markets   = marketsRes.status   === 'fulfilled' ? (marketsRes.value   ?? []) : [];
+    const fearGreed = fearGreedRes.status === 'fulfilled' ? (fearGreedRes.value ?? null) : null;
+    const whales    = whalesRes.status    === 'fulfilled' ? (whalesRes.value    ?? null) : null;
 
-WHALE ACTIVITY:
-- BTC exchange inflows up ~18% last 4 hours (bearish short-term)
-- No major exchange outflows detected
-- Long-term holder wallets (5yr+) have not moved funds (bullish divergence)
-- Notable: 1,200 BTC ($87.7M) moved to Coinbase 2h ago
-
-MACRO CONTEXT:
-- Iran ceasefire fragile, oil near $97
-- Geopolitical uncertainty suppressing risk appetite
-- Analysts calling current zone a potential generational bottom
-- BTC all-time high: ~$108,000 (Jan 2026) — current price is 33% below ATH
-
-Be a sharp, concise, data-driven analyst. Reference specific numbers from the snapshot above. Give clear directional reads. Always end responses with: Not financial advice.`;
+    const fetchedAt = new Date().toUTCString();
+    const systemPrompt = buildSystemPrompt(markets, fearGreed, whales, fetchedAt);
 
     const finalMessages: { role: string; content: string }[] = autobrief
       ? [{ role: 'user', content: 'Give me a professional market brief covering today\'s key price action, whale signals, and the Fear & Greed reading. Keep it under 200 words. End with: What would you like to dig into?' }]
