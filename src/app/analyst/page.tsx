@@ -147,7 +147,7 @@ export default function AnalystPage() {
                 textTransform: 'uppercase',
                 fontWeight: 700,
                 whiteSpace: 'nowrap',
-              }}>⚡ Powered by Claude AI</span>
+              }}>⚡ Powered by GPT-4o</span>
             </div>
             <p style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
               Live prices, whale alerts &amp; Fear &amp; Greed pulled fresh on every request.

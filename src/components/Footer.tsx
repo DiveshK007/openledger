@@ -47,7 +47,7 @@ export default function Footer() {
           <span style={{ color: 'var(--text-dim)' }}> · </span>
           <span style={{ color: 'var(--blue)' }}>DeFiLlama</span>
           <span style={{ color: 'var(--text-dim)' }}> · </span>
-          <span style={{ color: 'var(--yellow)' }}>Claude AI</span>
+          <span style={{ color: 'var(--yellow)' }}>GPT-4o</span>
           <br />
           <span style={{ color: 'var(--text-dim)' }}>Data is informational only · Not financial advice</span>
           <br />

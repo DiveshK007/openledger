@@ -142,10 +142,10 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, autobrief } = await req.json();
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured. Add it in Vercel → Settings → Environment Variables, then redeploy.' }),
+        JSON.stringify({ error: 'OPENAI_API_KEY not configured. Add it in Vercel → Settings → Environment Variables, then redeploy.' }),
         { status: 503, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -163,26 +163,27 @@ export async function POST(req: NextRequest) {
       ? [{ role: 'user', content: "Give me a professional market brief covering today's key price action, whale signals, and the Fear & Greed reading. Keep it under 200 words. End with: What would you like to dig into?" }]
       : (messages ?? []).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }));
 
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'gpt-4o',
         max_tokens: 600,
         stream: true,
-        system: systemPrompt,
-        messages: finalMessages,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...finalMessages,
+        ],
       }),
     });
 
-    if (!anthropicRes.ok) {
-      const errBody = await anthropicRes.text();
-      console.error('Anthropic API error:', anthropicRes.status, errBody);
-      let userMsg = `Claude API error (HTTP ${anthropicRes.status})`;
+    if (!openaiRes.ok) {
+      const errBody = await openaiRes.text();
+      console.error('OpenAI API error:', openaiRes.status, errBody);
+      let userMsg = `AI API error (HTTP ${openaiRes.status})`;
       try {
         const parsed = JSON.parse(errBody);
         const detail = parsed?.error?.message ?? parsed?.message;
@@ -190,7 +191,7 @@ export async function POST(req: NextRequest) {
       } catch { /* non-JSON error body */ }
       return new Response(
         JSON.stringify({ error: userMsg }),
-        { status: anthropicRes.status, headers: { 'Content-Type': 'application/json' } }
+        { status: openaiRes.status, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -199,7 +200,7 @@ export async function POST(req: NextRequest) {
 
     const readable = new ReadableStream({
       async start(controller) {
-        const reader = anthropicRes.body!.getReader();
+        const reader = openaiRes.body!.getReader();
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -211,12 +212,9 @@ export async function POST(req: NextRequest) {
               if (!raw || raw === '[DONE]') continue;
               try {
                 const parsed = JSON.parse(raw);
-                if (
-                  parsed.type === 'content_block_delta' &&
-                  parsed.delta?.type === 'text_delta' &&
-                  typeof parsed.delta.text === 'string'
-                ) {
-                  controller.enqueue(encoder.encode(parsed.delta.text));
+                const delta = parsed?.choices?.[0]?.delta?.content;
+                if (typeof delta === 'string') {
+                  controller.enqueue(encoder.encode(delta));
                 }
               } catch { /* skip malformed SSE lines */ }
             }
